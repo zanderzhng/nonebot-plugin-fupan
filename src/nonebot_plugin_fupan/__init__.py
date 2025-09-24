@@ -305,17 +305,27 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
     # Determine which trading day this check-in is for
     now = datetime.now()
     trading_day = today_str
+    next_trading_day_obj = None
+
     if not is_trading_day(now):
         # If today is not a trading day, this check-in is for the previous trading day
         previous_trading_day = get_previous_trading_day(now)
         if previous_trading_day:
             trading_day = previous_trading_day.strftime("%Y-%m-%d")
+        # Get the next trading day after the trading day this check-in is for
+        next_trading_day_obj = get_next_trading_day(previous_trading_day if previous_trading_day else now)
+    else:
+        # If today is a trading day, get the next trading day
+        next_trading_day_obj = get_next_trading_day(now)
+
+    next_trading_day_str = next_trading_day_obj.strftime("%Y-%m-%d") if next_trading_day_obj else None
 
     # 添加打卡记录，包含更多详细信息
     checkin_record = {
         "date": today_str,
         "timestamp": current_timestamp,
         "trading_day": trading_day,
+        "next_trading_day": next_trading_day_str,
         "context": "group" if group_id else "private"
     }
 
@@ -323,37 +333,24 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
     if conclusion:
         checkin_record["conclusion"] = conclusion
 
-    # Update strike count based on consecutive trading days
-    # Since strike count is based on unique trading days in the exchange calendar,
-    # we need to check if this new check-in continues the consecutive sequence
+    # Update strike count efficiently by comparing with previous check-in
     if len(user_data["checkins"]) > 0:
-        # Get unique trading days from existing check-ins
-        existing_trading_days = list({c.get("trading_day") for c in user_data["checkins"] if c.get("trading_day")})
+        # Get the previous check-in (the one before we add the new one)
+        previous_checkin = user_data["checkins"][-1]
+        previous_next_trading_day = previous_checkin.get("next_trading_day")
+        previous_trading_day = previous_checkin.get("trading_day")
 
-        if existing_trading_days:
-            # Convert to date objects and sort
-            existing_trading_dates = [datetime.strptime(day, "%Y-%m-%d").date() for day in existing_trading_days]
-            existing_trading_dates.sort()
-
-            # Get the most recent trading day that was checked in
-            most_recent_trading_date = existing_trading_dates[-1]
-            new_trading_date = datetime.strptime(trading_day, "%Y-%m-%d").date()
-
-            # Check if the new trading day is the next consecutive trading day
-            expected_next_trading_date = get_next_trading_day(datetime.combine(most_recent_trading_date, datetime.min.time()))
-            expected_next_str = expected_next_trading_date.strftime("%Y-%m-%d") if expected_next_trading_date else None
-
-            if expected_next_str and trading_day == expected_next_str:
-                # Consecutive trading day, increment strike count
-                user_data["strike_count"] += 1
-            elif new_trading_date == most_recent_trading_date:
-                # Same trading day (multiple check-ins for same day), strike count unchanged
-                pass
-            else:
-                # Not consecutive or same day, reset to 1
-                user_data["strike_count"] = 1
+        # Special case: if this check-in is for the same trading day as the previous one,
+        # it doesn't change the strike count (same trading day)
+        if trading_day == previous_trading_day:
+            # Same trading day, strike count unchanged
+            pass
+        # If this check-in's trading day matches the previous check-in's next trading day,
+        # it's a consecutive strike
+        elif previous_next_trading_day and trading_day == previous_next_trading_day:
+            user_data["strike_count"] += 1
         else:
-            # No existing trading days
+            # If not consecutive, reset to 1 (this check-in starts a new streak)
             user_data["strike_count"] = 1
     else:
         # First check-in, start with strike count of 1
@@ -583,10 +580,9 @@ async def handle_fupan_revoke(uniinfo: Uninfo = Arg()):
     user_data["checkins"].pop()
     user_data["total_count"] = len(user_data["checkins"])
 
-    # Update strike count efficiently after revoking
+    # Recalculate strike count after revoking
+    # For simplicity in this less frequent operation, we'll recalculate using the full sequence
     if len(user_data["checkins"]) > 0:
-        # After removing the last check-in, the strike count should be recalculated
-        # For simplicity in this less frequent operation, we'll recalculate
         user_data["strike_count"] = calculate_simple_strike_count(user_data["checkins"])
     else:
         # No check-ins left, reset strike count
