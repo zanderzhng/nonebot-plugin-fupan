@@ -73,6 +73,7 @@
         "date": "YYYY-MM-DD",
         "timestamp": 1234567890.123,
         "trading_day": "YYYY-MM-DD",  // Which trading day this check-in is for (always the previous trading day since check-ins happen after market close)
+        "next_trading_day": "YYYY-MM-DD",  // Next trading day after this check-in's trading day (for efficient strike calculation)
         "context": "group/private",
         "conclusion": "optional conclusion text" // optional field for user's conclusion
       }
