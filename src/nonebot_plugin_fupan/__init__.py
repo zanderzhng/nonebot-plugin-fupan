@@ -136,39 +136,6 @@ def get_next_trading_day(date: datetime) -> Optional[datetime]:
     return None
 
 
-def calculate_strike_count(checkins: list) -> int:
-    """计算连续打卡次数（基于连续交易日）"""
-    if not checkins:
-        return 0
-
-    # Sort checkins by date
-    sorted_checkins = sorted(checkins, key=lambda x: x["date"], reverse=True)
-
-    # Get all trading day checkins
-    trading_day_checkins = [c for c in sorted_checkins if c.get("trading_day", False)]
-    if not trading_day_checkins:
-        return 0
-
-    # Sort by date ascending to check consecutive days
-    trading_day_checkins.sort(key=lambda x: x["date"])
-
-    # Count consecutive trading days from the most recent
-    strike_count = 0
-    current_date = datetime.strptime(trading_day_checkins[-1]["date"], "%Y-%m-%d").date()
-
-    # Go backwards from the most recent checkin
-    for checkin in reversed(trading_day_checkins):
-        checkin_date = datetime.strptime(checkin["date"], "%Y-%m-%d").date()
-
-        # If this is the first iteration or the checkin is consecutive
-        if strike_count == 0 or (current_date - checkin_date).days == 1:
-            strike_count += 1
-            current_date = checkin_date
-        else:
-            # Break if not consecutive
-            break
-
-    return strike_count
 
 def get_time_window_for_context(user_id: str, group_id: Optional[str] = None) -> tuple[str, str]:
     """获取指定用户或群组的时间窗口配置"""
@@ -302,7 +269,7 @@ async def can_user_checkin(user_id: str, group_id: Optional[str] = None) -> tupl
     return True, "可以打卡"
 
 @fupan_checkin.handle()
-async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg()):
+async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Message = CommandArg()):
     """处理复盘打卡命令"""
     # 获取用户和群组信息
     user_id = str(uniinfo.user.id) if uniinfo.user else "unknown"
@@ -318,6 +285,9 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg()):
         elif hasattr(uniinfo.user, 'name') and uniinfo.user.name:
             nickname = uniinfo.user.name
 
+    # 获取结论文本（如果有）
+    conclusion = args.extract_plain_text().strip()
+
     # 检查是否可以打卡
     can_checkin, message = await can_user_checkin(user_id, group_id)
 
@@ -329,30 +299,68 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg()):
     # 更新昵称信息
     user_data["nickname"] = nickname
     today_str = datetime.now().strftime("%Y-%m-%d")
+    current_timestamp = datetime.now().timestamp()
     current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Determine which trading day this check-in is for
+    now = datetime.now()
+    trading_day = today_str
+    if not is_trading_day(now):
+        # If today is not a trading day, this check-in is for the previous trading day
+        previous_trading_day = get_previous_trading_day(now)
+        if previous_trading_day:
+            trading_day = previous_trading_day.strftime("%Y-%m-%d")
 
     # 添加打卡记录，包含更多详细信息
     checkin_record = {
         "date": today_str,
-        "time": current_time_str,
-        "trading_day": is_trading_day(datetime.now()),
-        "timestamp": datetime.now().timestamp(),
-        "day_of_week": datetime.now().weekday(),  # 0=Monday, 6=Sunday
-        "is_weekend": datetime.now().weekday() >= 5,
-        "context": "group" if group_id else "private",
-        "previous_trading_day": get_previous_trading_day(datetime.now()).strftime("%Y-%m-%d") if get_previous_trading_day(datetime.now()) else None,
-        "next_trading_day": get_next_trading_day(datetime.now()).strftime("%Y-%m-%d") if get_next_trading_day(datetime.now()) else None
+        "timestamp": current_timestamp,
+        "trading_day": trading_day,
+        "context": "group" if group_id else "private"
     }
 
-    # Add group ID context if in group
-    if group_id:
-        checkin_record["group_id"] = group_id
+    # 添加结论文本（如果有）
+    if conclusion:
+        checkin_record["conclusion"] = conclusion
+
+    # Update strike count based on consecutive trading days
+    # Since strike count is based on unique trading days in the exchange calendar,
+    # we need to check if this new check-in continues the consecutive sequence
+    if len(user_data["checkins"]) > 0:
+        # Get unique trading days from existing check-ins
+        existing_trading_days = list({c.get("trading_day") for c in user_data["checkins"] if c.get("trading_day")})
+
+        if existing_trading_days:
+            # Convert to date objects and sort
+            existing_trading_dates = [datetime.strptime(day, "%Y-%m-%d").date() for day in existing_trading_days]
+            existing_trading_dates.sort()
+
+            # Get the most recent trading day that was checked in
+            most_recent_trading_date = existing_trading_dates[-1]
+            new_trading_date = datetime.strptime(trading_day, "%Y-%m-%d").date()
+
+            # Check if the new trading day is the next consecutive trading day
+            expected_next_trading_date = get_next_trading_day(datetime.combine(most_recent_trading_date, datetime.min.time()))
+            expected_next_str = expected_next_trading_date.strftime("%Y-%m-%d") if expected_next_trading_date else None
+
+            if expected_next_str and trading_day == expected_next_str:
+                # Consecutive trading day, increment strike count
+                user_data["strike_count"] += 1
+            elif new_trading_date == most_recent_trading_date:
+                # Same trading day (multiple check-ins for same day), strike count unchanged
+                pass
+            else:
+                # Not consecutive or same day, reset to 1
+                user_data["strike_count"] = 1
+        else:
+            # No existing trading days
+            user_data["strike_count"] = 1
+    else:
+        # First check-in, start with strike count of 1
+        user_data["strike_count"] = 1
 
     user_data["checkins"].append(checkin_record)
     user_data["total_count"] = len(user_data["checkins"])
-
-    # Update strike count
-    user_data["strike_count"] = calculate_strike_count(user_data["checkins"])
 
     # 保存数据
     save_user_checkin_data(user_id, user_data, group_id)
@@ -378,10 +386,15 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg()):
                   f"━━━━━━━━━━━━━━━━\n"
                   f"  打卡时间：{current_time_str}\n"
                   f"  累计打卡：{user_data['total_count']}次\n"
-                  f"  连续打卡：{strike_count}连击\n"
-                  f"━━━━━━━━━━━━━━━━\n"
-                  f"  交易日（{current_trading_day_str}）已复盘\n"
-                  f"  下一个交易日：{next_trading_day_str}")
+                  f"  连续打卡：{strike_count}连击\n")
+
+    # 添加结论显示（如果有）
+    if conclusion:
+        success_msg += f"  复盘结论：{conclusion}\n"
+
+    success_msg += (f"━━━━━━━━━━━━━━━━\n"
+                   f"  交易日（{current_trading_day_str}）已复盘\n"
+                   f"  下一个交易日：{next_trading_day_str}")
     await fupan_checkin.finish(success_msg)
 
 # 统计命令
@@ -415,7 +428,12 @@ async def handle_fupan_stats(uniinfo: Uninfo = Arg()):
             # Format the date to be more readable
             formatted_date = date_str.replace("-", "年", 1).replace("-", "月", 1) + "日"
             context_type = "群" if checkin.get("context") == "group" else "私"
-            stats_msg += f"  {i+1}. {formatted_date} ({context_type})\n"
+
+            # Add conclusion if available
+            if checkin.get("conclusion"):
+                stats_msg += f"  {i+1}. {formatted_date} ({context_type})\n     复盘：{checkin['conclusion']}\n"
+            else:
+                stats_msg += f"  {i+1}. {formatted_date} ({context_type})\n"
     else:
         stats_msg += "📚 暂无打卡记录\n"
 
@@ -444,13 +462,14 @@ async def handle_fupan_help(uniinfo: Uninfo = Arg()):
     help_msg = ("📈 复盘打卡插件帮助\n"
                 "────────────────\n"
                 "📝 基本命令：\n"
-                "  /复盘 | /打卡 | /签到 - 每日复盘打卡\n"
+                "  /复盘 [复盘结论] | /打卡 [复盘结论] | /签到 [复盘结论] - 每日复盘打卡（可附加结论）\n"
                 "  /复盘统计 - 个人打卡统计\n"
                 "  /复盘排行 - 打卡排行榜\n\n"
                 "↩️ 其他命令：\n"
                 "  /复盘撤销 | /撤销复盘 - 撤销最后打卡\n"
                 f"  /复盘重置 - 重置数据（仅超级用户）\n"
                 f"  /复盘帮助 - 显示此帮助\n\n"
+                f"示例：/复盘 我觉得明天高开低走\n"
                 f"当前环境：{context}\n"
                 "────────────────\n"
                 "💡 数据在群聊和私聊中分开统计")
@@ -556,14 +575,22 @@ async def handle_fupan_revoke(uniinfo: Uninfo = Arg()):
     # 获取最后一个打卡记录
     last_checkin = user_data["checkins"][-1]
     last_checkin_date = last_checkin["date"]
-    last_checkin_time = last_checkin["time"]
+    # Convert timestamp to readable time format
+    last_checkin_timestamp = last_checkin["timestamp"]
+    last_checkin_time = datetime.fromtimestamp(last_checkin_timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
     # 移除最后一个打卡记录
     user_data["checkins"].pop()
     user_data["total_count"] = len(user_data["checkins"])
 
-    # Recalculate strike count after revoking
-    user_data["strike_count"] = calculate_strike_count(user_data["checkins"])
+    # Update strike count efficiently after revoking
+    if len(user_data["checkins"]) > 0:
+        # After removing the last check-in, the strike count should be recalculated
+        # For simplicity in this less frequent operation, we'll recalculate
+        user_data["strike_count"] = calculate_simple_strike_count(user_data["checkins"])
+    else:
+        # No check-ins left, reset strike count
+        user_data["strike_count"] = 0
 
     # 保存更新后的数据
     save_user_checkin_data(user_id, user_data, group_id)
@@ -577,3 +604,44 @@ async def handle_fupan_revoke(uniinfo: Uninfo = Arg()):
                   f"  连续打卡：{strike_count}连击\n"
                   f"━━━━━━━━━━━━━━━━")
     await fupan_revoke.finish(revoke_msg)
+
+
+def calculate_simple_strike_count(checkins: list) -> int:
+    """
+    Calculate strike count based on consecutive trading days.
+    This is a simplified version that's called when needed, not for every operation.
+
+    Args:
+        checkins: All check-ins for the user
+
+    Returns:
+        Strike count (consecutive trading days)
+    """
+    if not checkins:
+        return 0
+
+    # Get all unique trading days that were checked in for
+    trading_days_checked_in = list({c.get("trading_day") for c in checkins if c.get("trading_day")})
+
+    if not trading_days_checked_in:
+        return 0
+
+    # Convert to date objects and sort
+    trading_day_dates = [datetime.strptime(day, "%Y-%m-%d").date() for day in trading_days_checked_in]
+    trading_day_dates.sort()
+
+    # Count consecutive trading days from the most recent
+    strike_count = 0
+    current_date = trading_day_dates[-1]
+
+    # Go backwards from the most recent trading day
+    for trading_day in reversed(trading_day_dates):
+        # If this is the first iteration or the trading day is consecutive
+        if strike_count == 0 or (current_date - trading_day).days == 1:
+            strike_count += 1
+            current_date = trading_day
+        else:
+            # Break if not consecutive
+            break
+
+    return strike_count
