@@ -32,6 +32,11 @@ from nonebot_plugin_localstore import get_data_file, get_data_dir, get_plugin_da
 import exchange_calendars as xcals
 
 
+def get_current_datetime() -> datetime:
+    """Get current datetime - can be mocked for testing"""
+    return datetime.now()
+
+
 # 初始化交易所日历 (使用中国A股日历)
 xcal = xcals.get_calendar('XSHG')  # 上海证券交易所日历
 
@@ -160,9 +165,10 @@ def get_time_window_for_context(user_id: str, group_id: Optional[str] = None) ->
     # Fall back to global configuration
     return plugin_config.fupan_checkin_start_time, plugin_config.fupan_checkin_end_time
 
-def get_current_trading_status(user_id: str, group_id: Optional[str] = None) -> dict:
+def get_current_trading_status(user_id: str, group_id: Optional[str] = None, now: Optional[datetime] = None) -> dict:
     """获取当前交易状态，支持 per-group/per-user 配置"""
-    now = datetime.now()
+    if now is None:
+        now = get_current_datetime()
     today = now.date()
 
     # 获取用户或群组特定的时间窗口配置
@@ -235,10 +241,13 @@ def get_current_trading_status(user_id: str, group_id: Optional[str] = None) -> 
             "current_time": now
         }
 
-async def can_user_checkin(user_id: str, group_id: Optional[str] = None) -> tuple[bool, str]:
+async def can_user_checkin(user_id: str, group_id: Optional[str] = None, now: Optional[datetime] = None) -> tuple[bool, str]:
     """检查用户是否可以打卡"""
+    if now is None:
+        now = get_current_datetime()
+
     # 检查时间窗口
-    status = get_current_trading_status(user_id, group_id)
+    status = get_current_trading_status(user_id, group_id, now=now)
 
     if not status["is_in_checkin_window"]:
         if status["checkin_start"] and status["checkin_end"]:
@@ -248,12 +257,11 @@ async def can_user_checkin(user_id: str, group_id: Optional[str] = None) -> tupl
 
     # 检查今日是否已打卡
     user_data = load_user_checkin_data(user_id, group_id)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = now.strftime("%Y-%m-%d")
 
     for checkin in user_data["checkins"]:
         if checkin["date"] == today_str:
             # 获取当前和下一个交易日信息
-            now = datetime.now()
             current_trading_day = now.date()
             # 如果今天是交易日，则显示今天的日期作为当前交易日
             if is_trading_day(now):
@@ -273,6 +281,9 @@ async def can_user_checkin(user_id: str, group_id: Optional[str] = None) -> tupl
 @fupan_checkin.handle()
 async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Message = CommandArg()):
     """处理复盘打卡命令"""
+    # 获取当前时间戳，可被测试mock
+    now = get_current_datetime()
+
     # 获取用户和群组信息
     user_id = str(uniinfo.user.id) if uniinfo.user else "unknown"
     group_id = str(uniinfo.scene.id) if uniinfo.scene and uniinfo.scene.is_group else None
@@ -291,7 +302,7 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
     conclusion = args.extract_plain_text().strip()
 
     # 检查是否可以打卡
-    can_checkin, message = await can_user_checkin(user_id, group_id)
+    can_checkin, message = await can_user_checkin(user_id, group_id, now=now)
 
     if not can_checkin:
         await fupan_checkin.finish(message)
@@ -300,12 +311,11 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
     user_data = load_user_checkin_data(user_id, group_id)
     # 更新昵称信息
     user_data["nickname"] = nickname
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    current_timestamp = datetime.now().timestamp()
-    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    today_str = now.strftime("%Y-%m-%d")
+    current_timestamp = now.timestamp()
+    current_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
     # Determine which trading day this check-in is for
-    now = datetime.now()
     trading_day = today_str
     next_trading_day_obj = None
 
@@ -366,7 +376,6 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
 
 
     # 获取当前和下一个交易日信息
-    now = datetime.now()
     current_trading_day = now.date()
     # 如果今天是交易日，则显示今天的日期作为当前交易日
     if is_trading_day(now):

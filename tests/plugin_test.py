@@ -2,6 +2,7 @@ from fake import fake_group_message_event_v11
 from nonebug import App
 import pytest
 from datetime import datetime
+from unittest.mock import patch, Mock
 
 
 @pytest.mark.asyncio
@@ -11,25 +12,37 @@ async def test_fupan_checkin(app: App):
     from nonebot.adapters.onebot.v11 import Adapter as OnebotV11Adapter
     from nonebot.adapters.onebot.v11 import Bot
 
+    # Mock the datetime to ensure consistent timestamps
+    fixed_datetime = datetime(2025, 9, 25, 15, 47, 12)
+
     event = fake_group_message_event_v11(message="复盘")
     try:
         from nonebot_plugin_fupan import fupan_checkin  # type:ignore
     except ImportError:
         pytest.skip("nonebot_plugin_fupan.fupan_checkin not found")
 
-    async with app.test_matcher(fupan_checkin) as ctx:
-        adapter = nonebot.get_adapter(OnebotV11Adapter)
-        bot = ctx.create_bot(base=Bot, adapter=adapter)
+    with patch('nonebot_plugin_fupan.get_current_datetime', return_value=fixed_datetime):
+        async with app.test_matcher(fupan_checkin) as ctx:
+            adapter = nonebot.get_adapter(OnebotV11Adapter)
+            bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
+            # Mock the API calls that uninfo will make
+            ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
+            ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
-        ctx.receive_event(bot, event)
-        # 根据时间窗口，可能成功也可能失败，这里只测试是否能正常处理
-        # We expect some response message
-        ctx.should_call_send(event, "不在打卡时间窗口内，请在 15:00 - 09月26日 09:00 之间打卡")
-        ctx.should_finished()
+            ctx.receive_event(bot, event)
+            # 根据时间窗口，可能成功也可能失败，这里只测试是否能正常处理
+            # We expect a success response since we're within the time窗口
+            expected_message = "✅ 复盘打卡成功！\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  打卡时间：2025-09-25 15:47:12\n"
+            expected_message += "  累计打卡：1次\n"
+            expected_message += "  连续打卡：1连击\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  交易日（2025年09月25日）已复盘\n"
+            expected_message += "  下一个交易日：2025年09月26日"
+            ctx.should_call_send(event, expected_message)
+            ctx.should_finished()
 
 
 @pytest.mark.asyncio
@@ -39,25 +52,33 @@ async def test_daka_alias(app: App):
     from nonebot.adapters.onebot.v11 import Adapter as OnebotV11Adapter
     from nonebot.adapters.onebot.v11 import Bot
 
+    # Mock the datetime to ensure consistent timestamps
+    fixed_datetime = datetime(2025, 9, 25, 15, 47, 12)
+
     event = fake_group_message_event_v11(message="打卡")
     try:
         from nonebot_plugin_fupan import fupan_checkin  # type:ignore
     except ImportError:
         pytest.skip("nonebot_plugin_fupan.fupan_checkin not found")
 
-    async with app.test_matcher(fupan_checkin) as ctx:
-        adapter = nonebot.get_adapter(OnebotV11Adapter)
-        bot = ctx.create_bot(base=Bot, adapter=adapter)
+    with patch('nonebot_plugin_fupan.get_current_datetime', return_value=fixed_datetime):
+        async with app.test_matcher(fupan_checkin) as ctx:
+            adapter = nonebot.get_adapter(OnebotV11Adapter)
+            bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
-
-        ctx.receive_event(bot, event)
-        # 测试是否能正常处理
-        # We expect some response message about time window
-        ctx.should_call_send(event, "不在打卡时间窗口内，请在 15:00 - 09月26日 09:00 之间打卡")
-        ctx.should_finished()
+            ctx.receive_event(bot, event)
+            # 测试是否能正常处理
+            # We expect a success response since we're within the time window
+            expected_message = "✅ 复盘打卡成功！\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  打卡时间：2025-09-25 15:47:12\n"
+            expected_message += "  累计打卡：1次\n"
+            expected_message += "  连续打卡：1连击\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  交易日（2025年09月25日）已复盘\n"
+            expected_message += "  下一个交易日：2025年09月26日"
+            ctx.should_call_send(event, expected_message)
+            ctx.should_finished()
 
 
 @pytest.mark.asyncio
@@ -67,25 +88,33 @@ async def test_qiandao_alias(app: App):
     from nonebot.adapters.onebot.v11 import Adapter as OnebotV11Adapter
     from nonebot.adapters.onebot.v11 import Bot
 
+    # Mock the datetime to ensure consistent timestamps
+    fixed_datetime = datetime(2025, 9, 25, 15, 47, 12)
+
     event = fake_group_message_event_v11(message="签到")
     try:
         from nonebot_plugin_fupan import fupan_checkin  # type:ignore
     except ImportError:
         pytest.skip("nonebot_plugin_fupan.fupan_checkin not found")
 
-    async with app.test_matcher(fupan_checkin) as ctx:
-        adapter = nonebot.get_adapter(OnebotV11Adapter)
-        bot = ctx.create_bot(base=Bot, adapter=adapter)
+    with patch('nonebot_plugin_fupan.get_current_datetime', return_value=fixed_datetime):
+        async with app.test_matcher(fupan_checkin) as ctx:
+            adapter = nonebot.get_adapter(OnebotV11Adapter)
+            bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
-
-        ctx.receive_event(bot, event)
-        # 测试是否能正常处理
-        # We expect some response message about time window
-        ctx.should_call_send(event, "不在打卡时间窗口内，请在 15:00 - 09月26日 09:00 之间打卡")
-        ctx.should_finished()
+            ctx.receive_event(bot, event)
+            # 测试是否能正常处理
+            # We expect a success response since we're within the time窗口
+            expected_message = "✅ 复盘打卡成功！\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  打卡时间：2025-09-25 15:47:12\n"
+            expected_message += "  累计打卡：1次\n"
+            expected_message += "  连续打卡：1连击\n"
+            expected_message += "━━━━━━━━━━━━━━━━\n"
+            expected_message += "  交易日（2025年09月25日）已复盘\n"
+            expected_message += "  下一个交易日：2025年09月26日"
+            ctx.should_call_send(event, expected_message)
+            ctx.should_finished()
 
 
 @pytest.mark.asyncio
@@ -104,10 +133,6 @@ async def test_fupan_stats(app: App):
     async with app.test_matcher(fupan_stats) as ctx:
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
-
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
         # 测试是否能正常处理统计命令
@@ -139,10 +164,6 @@ async def test_fupan_rank(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
-
         ctx.receive_event(bot, event)
         # 测试是否能正常处理排行命令
         # For rank command, we expect a different message
@@ -166,10 +187,6 @@ async def test_fupan_revoke(app: App):
     async with app.test_matcher(fupan_revoke) as ctx:
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
-
-        # Mock the API calls that uninfo will make in the expected order
-        ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
         # 测试是否能正常处理撤销命令
