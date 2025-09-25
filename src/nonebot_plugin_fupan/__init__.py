@@ -28,7 +28,7 @@ import json
 from typing import Optional
 from pathlib import Path
 
-from nonebot_plugin_localstore import get_data_file, get_data_dir
+from nonebot_plugin_localstore import get_data_file, get_data_dir, get_plugin_data_dir
 import exchange_calendars as xcals
 
 
@@ -56,18 +56,20 @@ fupan_help = on_command("复盘帮助", aliases={"复盘 help"})
 def get_checkin_data_file(user_id: str, group_id: Optional[str] = None) -> Path:
     """获取用户打卡数据文件路径"""
     if group_id:
-        path = get_data_file("fupan", f"checkin_{user_id}_group_{group_id}.json")
+        data_dir = get_plugin_data_dir()
+        path = data_dir / f"checkin_{user_id}_group_{group_id}.json"
         # logger.debug(f"Group data file path: {path}")
         return path
     else:
-        path = get_data_file("fupan", f"checkin_{user_id}_dm.json")
+        data_dir = get_plugin_data_dir()
+        path = data_dir / f"checkin_{user_id}_dm.json"
         # logger.debug(f"DM data file path: {path}")
         # logger.debug(f"Data directory: {path.parent}")
         return path
 
 def get_all_checkin_files() -> list[Path]:
     """获取所有用户的打卡数据文件"""
-    data_dir = get_data_dir("fupan")
+    data_dir = get_plugin_data_dir()
     return list(data_dir.glob("checkin_*.json"))
 
 def load_user_checkin_data(user_id: str, group_id: Optional[str] = None) -> dict:
