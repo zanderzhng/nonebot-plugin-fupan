@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-fupan"
-version = "0.1.6"
+version = "0.1.7"
 description = "NoneBot 复盘打卡插件，用于帮助交易者进行每日复盘打卡。支持交易日判断、时间窗口控制、数据统计等功能。"
 readme = "README.md"
 authors = [{ name = "zanderzhng", email = "zanderzhng@gmail.com" }]
@@ -138,7 +138,7 @@ requires = ["uv_build>=0.8.0,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.bumpversion]
-current_version = "0.1.6"
+current_version = "0.1.7"
 commit = true
 message = "🔖 release: bump vesion from {current_version} to {new_version}"
 tag = true
