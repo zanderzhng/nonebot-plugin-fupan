@@ -510,7 +510,7 @@ async def handle_fupan_reset(args: Message = CommandArg(), uniinfo: Uninfo = Arg
                                  f"⚠️ 注意：此操作不可逆，请谨慎使用！")
 
 @fupan_rank.handle()
-async def handle_fupan_rank(uniinfo: Uninfo = Arg()):
+async def handle_fupan_rank(uniinfo: Uninfo):
     """处理复盘排行命令"""
     user_id = str(uniinfo.user.id) if uniinfo.user else "unknown"
     group_id = str(uniinfo.scene.id) if uniinfo.scene and uniinfo.scene.is_group else None
@@ -559,7 +559,7 @@ async def handle_fupan_rank(uniinfo: Uninfo = Arg()):
 
 
 @fupan_revoke.handle()
-async def handle_fupan_revoke(uniinfo: Uninfo = Arg()):
+async def handle_fupan_revoke(uniinfo: Uninfo):
     """处理撤销复盘打卡命令"""
     # 获取用户信息
     user_id = str(uniinfo.user.id) if uniinfo.user else "unknown"

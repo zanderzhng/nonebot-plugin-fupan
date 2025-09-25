@@ -21,9 +21,8 @@ async def test_fupan_checkin(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
@@ -50,9 +49,8 @@ async def test_daka_alias(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
@@ -79,9 +77,8 @@ async def test_qiandao_alias(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
@@ -108,9 +105,8 @@ async def test_fupan_stats(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
@@ -143,9 +139,8 @@ async def test_fupan_rank(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
@@ -172,9 +167,8 @@ async def test_fupan_revoke(app: App):
         adapter = nonebot.get_adapter(OnebotV11Adapter)
         bot = ctx.create_bot(base=Bot, adapter=adapter)
 
-        # Mock the get_group_info API call that uninfo will make
+        # Mock the API calls that uninfo will make in the expected order
         ctx.should_call_api("get_group_info", {"group_id": event.group_id}, {"group_id": event.group_id, "group_name": "test_group"})
-        # Mock the get_group_member_info API call that uninfo will make
         ctx.should_call_api("get_group_member_info", {"group_id": event.group_id, "user_id": event.user_id, "no_cache": True}, {"group_id": event.group_id, "user_id": event.user_id, "nickname": "test", "card": ""})
 
         ctx.receive_event(bot, event)
