@@ -51,7 +51,6 @@ fupan_revoke = on_command("复盘撤销", aliases={"撤销复盘"})
 fupan_reset = on_command("复盘重置")
 
 # 帮助命令
-fupan_help = on_command("复盘帮助", aliases={"复盘 help"})
 
 def get_checkin_data_file(user_id: str, group_id: Optional[str] = None) -> Path:
     """获取用户打卡数据文件路径"""
@@ -398,8 +397,6 @@ async def handle_fupan_checkin(state: T_State, uniinfo: Uninfo = Arg(), args: Me
     await fupan_checkin.finish(success_msg)
 
 # 统计命令
-fupan_stats = on_command("复盘统计", aliases={"复盘 stats"})
-
 @fupan_stats.handle()
 async def handle_fupan_stats(uniinfo: Uninfo = Arg()):
     """处理复盘统计命令"""
@@ -439,18 +436,9 @@ async def handle_fupan_stats(uniinfo: Uninfo = Arg()):
 
     await fupan_stats.finish(stats_msg)
 
-# 排行命令
-fupan_rank = on_command("复盘排行", aliases={"复盘 rank"})
-
-# 撤销打卡命令
-fupan_revoke = on_command("复盘撤销", aliases={"撤销复盘"})
-
-# 数据重置命令
-fupan_reset = on_command("复盘重置")
-
 # 帮助命令
-fupan_help = on_command("复盘帮助", aliases={"复盘 help"})
 
+fupan_help = on_command("复盘帮助", aliases={"复盘 help"})
 
 @fupan_help.handle()
 async def handle_fupan_help(uniinfo: Uninfo = Arg()):
