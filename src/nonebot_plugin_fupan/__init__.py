@@ -4,12 +4,13 @@ from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 from nonebot.params import CommandArg, Arg
 from nonebot.typing import T_State
 from nonebot.adapters import Message
-from nonebot_plugin_uninfo import get_interface, Uninfo
 
 require("nonebot_plugin_uninfo")
 require("nonebot_plugin_localstore")
 require("nonebot_plugin_apscheduler")
 from .config import Config, plugin_config
+from nonebot_plugin_uninfo import get_interface, Uninfo
+
 
 __plugin_meta__ = PluginMetadata(
     name="复盘打卡",
